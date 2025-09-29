@@ -22,6 +22,7 @@ export const createOrUpdateUser = async (req, res) => {
             // Tạo mới user
             const newUser = new User({ uid, name, email, photoURL });
             await newUser.save();
+            console.log("Tạo thành công")
             return res.status(201).json({ message: 'Tạo người dùng thành công', user: newUser, status: true });
         }
 
