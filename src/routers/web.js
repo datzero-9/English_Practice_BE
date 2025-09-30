@@ -1,12 +1,16 @@
 import express from 'express';
 import { createOrUpdateUser, getUserInfo } from '../controllers/user.js';
+import { addVocabulary,getRandomVocabularies } from '../controllers/vocabulary.js';
 
 const router = express.Router();
 
 // Route POST - thêm hoặc cập nhật user
 router.post('/user', createOrUpdateUser);
-
-// Route GET - lấy thông tin user theo UID
 router.get('/user/:uid', getUserInfo);
 
+
+//Vocabulary
+
+router.post('/addVocabulary',addVocabulary);
+router.get('/getRandomVocabularies',getRandomVocabularies);
 export default router;
