@@ -2,28 +2,28 @@
 import Vocabulary from '../models/vocabulary.js';
 
 export const addVocabulary = async (req, res) => {
-    try {
-        const { english, vietnamese, exampleEn, exampleVi, createdById, createdByName } = req.body;
+  try {
+    const { english, vietnamese, exampleEn, exampleVi, createdById, createdByName } = req.body;
 
-        if (!english || !vietnamese || !createdById) {
-            return res.status(400).json({ message: 'Thiếu dữ liệu bắt buộc', status: false });
-        }
-
-        const newWord = new Vocabulary({
-            english,
-            vietnamese,
-            exampleEn,
-            exampleVi,
-            createdById,
-            createdByName
-        });
-
-        await newWord.save();
-        return res.status(201).json({ message: 'Đã thêm từ vựng mới', vocabulary: newWord, status: true });
-    } catch (err) {
-        console.error("Lỗi thêm từ vựng:", err);
-        return res.status(500).json({ message: 'Lỗi server khi thêm từ vựng', status: false });
+    if (!english || !vietnamese || !createdById) {
+      return res.status(400).json({ message: 'Thiếu dữ liệu bắt buộc', status: false });
     }
+
+    const newWord = new Vocabulary({
+      english,
+      vietnamese,
+      exampleEn,
+      exampleVi,
+      createdById,
+      createdByName
+    });
+
+    await newWord.save();
+    return res.status(201).json({ message: 'Đã thêm từ vựng mới', vocabulary: newWord, status: true });
+  } catch (err) {
+    console.error("Lỗi thêm từ vựng:", err);
+    return res.status(500).json({ message: 'Lỗi server khi thêm từ vựng', status: false });
+  }
 };
 
 
@@ -56,5 +56,43 @@ export const getRandomVocabularies = async (req, res) => {
   } catch (err) {
     console.error('Lỗi lấy từ vựng:', err);
     return res.status(500).json({ message: 'Lỗi server khi lấy dữ liệu', status: false });
+  }
+};
+
+export const deleteVocabulary = async (req, res) => {
+  try {
+    const { id, createdById } = req.body;
+
+    if (!id || !createdById) {
+      return res.status(400).json({
+        message: "Thiếu dữ liệu bắt buộc (id hoặc createdById)",
+        status: false,
+      });
+    }
+
+    const vocab = await Vocabulary.findById(id);
+    if (!vocab) {
+      return res.status(404).json({
+        message: "Không tìm thấy từ vựng cần xóa",
+        status: false,
+      });
+    }
+
+    console.log("vocab.createdById:", vocab.createdById);
+    console.log("createdById FE gửi:", createdById);
+    console.log("So sánh:", vocab.createdById === createdById);
+
+
+    // 🔐 So sánh chính xác
+    if (String(vocab.createdById) !== String(createdById)) {
+      return res.status(403).json({ message: "Không có quyền xóa từ vựng này" });
+    }
+
+    // 🗑️ Xóa từ
+    await vocab.deleteOne();
+
+    return res.status(200).json({ message: "Đã xóa từ vựng thành công", });
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi server khi xóa từ vựng", });
   }
 };

@@ -1,6 +1,6 @@
 import express from 'express';
 import { createOrUpdateUser, getUserInfo } from '../controllers/user.js';
-import { addVocabulary,getRandomVocabularies } from '../controllers/vocabulary.js';
+import { addVocabulary,getRandomVocabularies,deleteVocabulary } from '../controllers/vocabulary.js';
 
 const router = express.Router();
 
@@ -13,4 +13,6 @@ router.get('/user/:uid', getUserInfo);
 
 router.post('/addVocabulary',addVocabulary);
 router.get('/getRandomVocabularies',getRandomVocabularies);
+router.post('/deleteVocabulary', deleteVocabulary);
+
 export default router;
