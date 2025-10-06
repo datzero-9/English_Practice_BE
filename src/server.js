@@ -29,6 +29,10 @@ connect();
 // Cho phép CORS
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// express.json() → đọc body kiểu JSON (Content-Type: application/json)
+
+// express.urlencoded() → đọc body kiểu form (x-www-form-urlencoded)
 // Sử dụng router
 app.use('/api', router);
 

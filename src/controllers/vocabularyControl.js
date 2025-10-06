@@ -1,5 +1,5 @@
 // ✅ @desc: Thêm từ vựng mới
-import Vocabulary from '../models/vocabulary.js';
+import Vocabulary from '../models/vocabularyModel.js';
 
 export const addVocabulary = async (req, res) => {
   try {

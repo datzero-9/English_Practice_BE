@@ -1,5 +1,5 @@
-// src/controllers/UserController.js
-import User from '../models/user.js'; // model mới đã cập nhật uid, name, email, photoURL
+
+import User from '../models/userModel.js'; // model mới đã cập nhật uid, name, email, photoURL
 
 // @desc: Thêm người dùng từ client sau khi đăng nhập Firebase
 export const createOrUpdateUser = async (req, res) => {
