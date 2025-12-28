@@ -1,42 +1,35 @@
-// ✅ Cú pháp import theo ES Module
 import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-// import ViewEngine from './config/viewEngine.js';
 import router from './routers/web.js';
 
-// Khởi tạo biến môi trường
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 80;
-const hostname = process.env.HOST_NAME;
-const mongodb = process.env.MONGODB_URL;
 
-// Kết nối MongoDB
-async function connect() {
+// 1. Kết nối MongoDB
+const connectDB = async () => {
   try {
-    await mongoose.connect(mongodb);
-    console.log('Kết nối thành công');
+    await mongoose.connect(process.env.MONGODB_URL);
+    console.log('✅ MongoDB Connected Successfully');
   } catch (error) {
-    console.log('Kết nối thất bại:', error);
+    console.error('❌ MongoDB Connection Failed:', error);
+    process.exit(1);
   }
-}
-connect();
+};
+connectDB();
 
-
-// Cho phép CORS
+// 2. Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// express.json() → đọc body kiểu JSON (Content-Type: application/json)
 
-// express.urlencoded() → đọc body kiểu form (x-www-form-urlencoded)
-// Sử dụng router
+// 3. Router
 app.use('/api', router);
 
-// Chạy server
+// 4. Start Server
 app.listen(port, () => {
-  console.log(`Đang chạy tại http://${hostname}:${port}`);
+  console.log(`🚀 Server is running at http://localhost:${port}`);
 });

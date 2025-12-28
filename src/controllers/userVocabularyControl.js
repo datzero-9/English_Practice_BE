@@ -1,102 +1,81 @@
-import Vocabulary from '../models/vocabularyModel.js';
 import UserVocabulary from '../models/userVocabularyModel.js';
+import Vocabulary from '../models/vocabularyModel.js';
 
-
-
-
+// Đánh dấu thuộc
 export const markAsMemorized = async (req, res) => {
-  console.log(req.body);
   try {
     const { userId, vocabId } = req.body;
-
-    if (!userId || !vocabId)
-      return res.status(400).json({ message: 'Thiếu userId hoặc vocabId', status: false });
-
-    let record = await UserVocabulary.findOne({ userId, vocabId });
-    if (record) {
-      record.isMemorized = true;
-      record.reviewCount += 1;
-      record.lastReviewed = new Date();
-      await record.save();
-      res.json({ message: 'Bạn đã thuộc từ này trước đây...', status: true });
-
-    } else {
-      await UserVocabulary.create({
-        userId,
-        vocabId,
-        isMemorized: true,
-        reviewCount: 1,
-        lastReviewed: new Date(),
-
-      });
-    }
-
-    res.status(200).json({ message: 'Đã đánh dấu là ĐÃ THUỘC', status: true });
+    await UserVocabulary.findOneAndUpdate(
+      { userId, vocabId },
+      { $set: { isMemorized: true, lastReviewed: new Date() }, $inc: { reviewCount: 1 } },
+      { upsert: true, new: true }
+    );
+    res.status(200).json({ status: true, message: "Đã đánh dấu thuộc" });
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', status: false });
+    res.status(500).json({ status: false, message: "Lỗi server" });
   }
 };
 
+// Bỏ đánh dấu thuộc
 export const unmarkAsMemorized = async (req, res) => {
   try {
     const { userId, vocabId } = req.body;
-    if (!userId || !vocabId)
-      return res.status(400).json({ message: "Thiếu userId hoặc vocabId", status: false });
-
-    const record = await UserVocabulary.findOne({ userId, vocabId });
-    if (!record)
-      return res.status(404).json({ message: "Không tìm thấy từ này trong danh sách học", status: false });
-
-    record.isMemorized = false;
-    await record.save();
-
-    res.status(200).json({ message: "Đã chuyển từ này sang CHƯA THUỘC", status: true });
+    await UserVocabulary.findOneAndUpdate({ userId, vocabId }, { $set: { isMemorized: false } });
+    res.status(200).json({ status: true, message: "Đã bỏ thuộc" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi server", status: false });
+    res.status(500).json({ status: false, message: "Lỗi server" });
   }
 };
 
-
+// Lấy từ vựng của User (Chia 2 loại: Đã thuộc & Chưa thuộc)
 export const getAllVocabulariesByUser = async (req, res) => {
-  // console.log(req.params.id);
   try {
-    const userId = req.params.id;
+    const { id: userId } = req.params;
+    
+    // 1. Lấy list ID đã thuộc
+    const memorizedRecords = await UserVocabulary.find({ userId, isMemorized: true }).select('vocabId').lean();
+    const memorizedIds = memorizedRecords.map(r => r.vocabId);
 
-    if (!userId)
-      return res.status(400).json({ message: "Thiếu userId", status: false });
+    // 2. Query song song
+    const [memorized, unmemorized] = await Promise.all([
+      Vocabulary.find({ _id: { $in: memorizedIds } }).lean(),
+      Vocabulary.find({ _id: { $nin: memorizedIds } }).limit(50).lean() // Lấy 50 từ chưa thuộc để học
+    ]);
 
-    // 1️⃣ Lấy danh sách vocabId mà user đã thuộc
-    const memorizedRecords = await UserVocabulary.find({
-      userId,
-      isMemorized: true,
-    }).select("vocabId");
-
-    const memorizedIds = memorizedRecords.map((r) => r.vocabId);
-
-    // 2️⃣ Lấy chi tiết các từ đã thuộc
-    const memorized = await Vocabulary.find({ _id: { $in: memorizedIds } });
-
-    // 3️⃣ Lấy các từ chưa thuộc
-    const unmemorized = await Vocabulary.find({
-      _id: { $nin: memorizedIds },
-    }).sort({ createdAt: 1 });
-
-    // 4️⃣ Trả về kết quả gộp
-    return res.status(200).json({
-      message: "Lấy danh sách từ ĐÃ và CHƯA thuộc thành công",
-      memorizedCount: memorized.length,
-      unmemorizedCount: unmemorized.length,
-      data: {
-        memorized,
-        unmemorized,
-      },
-      status: true,
-    });
+    res.status(200).json({ status: true, data: { memorized, unmemorized } });
   } catch (err) {
-    console.error("❌ Lỗi getAllVocabulariesByUser:", err);
-    res.status(500).json({ message: "Lỗi server", status: false });
+    res.status(500).json({ status: false, message: "Lỗi server" });
   }
 };
 
-
-
+// 🔥 API BXH: Đếm số từ đã thuộc
+export const getLeaderboard = async (req, res) => {
+  try {
+    const leaderboard = await UserVocabulary.aggregate([
+      { $match: { isMemorized: true } }, // Chỉ đếm từ đã thuộc
+      { $group: { _id: "$userId", score: { $sum: 1 } } }, // Gom nhóm theo user, đếm số lượng
+      { $sort: { score: -1 } }, // Sắp xếp giảm dần
+      { $limit: 20 }, // Lấy top 20
+      {
+        $lookup: { // Lấy info User
+          from: "users",
+          localField: "_id",
+          foreignField: "uid",
+          as: "userInfo"
+        }
+      },
+      { $unwind: "$userInfo" },
+      {
+        $project: {
+          uid: "$_id",
+          name: "$userInfo.name",
+          avatar: "$userInfo.photoURL",
+          score: 1
+        }
+      }
+    ]);
+    res.status(200).json({ status: true, data: leaderboard });
+  } catch (err) {
+    res.status(500).json({ status: false, message: "Lỗi server" });
+  }
+};

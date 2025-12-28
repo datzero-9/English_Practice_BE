@@ -3,11 +3,10 @@ import mongoose from 'mongoose';
 const vocabularySchema = new mongoose.Schema({
   english: { type: String, required: true },
   vietnamese: { type: String, required: true },
-  exampleEn: { type: String },
-  exampleVi: { type: String },
-  createdById: { type: String, required: true },  
-  createdByName: { type: String },               
-  createdAt: { type: Date, default: Date.now }        
-});
+  exampleEn: String,
+  exampleVi: String,
+  // Chỉ lưu ID người tạo
+  createdById: { type: String, required: true, ref: 'User' }, 
+}, { timestamps: true });
 
 export default mongoose.model('Vocabulary', vocabularySchema);

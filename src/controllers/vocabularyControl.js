@@ -1,98 +1,57 @@
-// ✅ @desc: Thêm từ vựng mới
 import Vocabulary from '../models/vocabularyModel.js';
 
+// Thêm từ vào kho
 export const addVocabulary = async (req, res) => {
   try {
-    const { english, vietnamese, exampleEn, exampleVi, createdById, createdByName } = req.body;
+    const { english, vietnamese, exampleEn, exampleVi, createdById } = req.body;
+    if (!english || !createdById) return res.status(400).json({ status: false, message: "Thiếu dữ liệu" });
 
-    if (!english || !vietnamese || !createdById) {
-      return res.status(400).json({ message: 'Thiếu dữ liệu bắt buộc', status: false });
-    }
-
-    const newWord = new Vocabulary({
-      english,
-      vietnamese,
-      exampleEn,
-      exampleVi,
-      createdById,
-      createdByName
-    });
-
-    await newWord.save();
-    return res.status(201).json({ message: 'Đã thêm từ vựng mới', vocabulary: newWord, status: true });
+    const newWord = await Vocabulary.create({ english, vietnamese, exampleEn, exampleVi, createdById });
+    res.status(201).json({ status: true, message: "Thêm thành công", vocabulary: newWord });
   } catch (err) {
-    console.error("Lỗi thêm từ vựng:", err);
-    return res.status(500).json({ message: 'Lỗi server khi thêm từ vựng', status: false });
+    res.status(500).json({ status: false, message: "Lỗi server" });
   }
 };
 
-
+// Lấy từ ngẫu nhiên (Join với User để lấy Avatar người tạo)
 export const getRandomVocabularies = async (req, res) => {
   try {
-    const sizeParam = parseInt(req.query.size, 10);
-    const hasSize = !Number.isNaN(sizeParam) && sizeParam > 0;
-
-    // Sắp xếp theo cũ nhất -> mới nhất (ưu tiên createdAt, fallback _id nếu cần)
-    const sortOrder = { createdAt: 1, _id: 1 };
-
-    let query = Vocabulary.find({}).sort(sortOrder).lean();
-
-    if (hasSize) {
-      query = query.limit(sizeParam);
-    }
-
-    const items = await query;
-    const total = await Vocabulary.countDocuments({});
-
-    return res.status(200).json({
-      message: hasSize
-        ? `Lấy ${items.length} từ vựng cũ nhất thành công`
-        : 'Lấy toàn bộ từ vựng (cũ nhất trước) thành công',
-      status: true,
-      total,          // tổng số từ trong CSDL
-      count: items.length, // số lượng trả về
-      data: items,
-    });
+    const size = parseInt(req.query.size) || 20;
+    const items = await Vocabulary.aggregate([
+      { $sample: { size: size } }, // Random thật sự
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdById',
+          foreignField: 'uid',
+          as: 'creatorInfo'
+        }
+      },
+      { $unwind: { path: '$creatorInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          english: 1, vietnamese: 1, exampleEn: 1, exampleVi: 1, createdById: 1,
+          createdByName: { $ifNull: ['$creatorInfo.name', 'Ẩn danh'] },
+          createdByAvatar: '$creatorInfo.photoURL'
+        }
+      }
+    ]);
+    res.status(200).json({ status: true, data: items });
   } catch (err) {
-    console.error('Lỗi lấy từ vựng:', err);
-    return res.status(500).json({ message: 'Lỗi server khi lấy dữ liệu', status: false });
+    res.status(500).json({ status: false, message: "Lỗi server" });
   }
 };
 
 export const deleteVocabulary = async (req, res) => {
-  try {
-    const { id, createdById } = req.body;
-
-    if (!id || !createdById) {
-      return res.status(400).json({
-        message: "Thiếu dữ liệu bắt buộc (id hoặc createdById)",
-        status: false,
-      });
+    try {
+        const { id, createdById } = req.body;
+        const vocab = await Vocabulary.findById(id);
+        if (!vocab) return res.status(404).json({ status: false, message: "Không tìm thấy" });
+        if (String(vocab.createdById) !== String(createdById)) return res.status(403).json({ status: false, message: "Không có quyền xóa" });
+        
+        await vocab.deleteOne();
+        res.status(200).json({ status: true, message: "Đã xóa" });
+    } catch (err) {
+        res.status(500).json({ status: false, message: "Lỗi server" });
     }
-
-    const vocab = await Vocabulary.findById(id);
-    if (!vocab) {
-      return res.status(404).json({
-        message: "Không tìm thấy từ vựng cần xóa",
-        status: false,
-      });
-    }
-
-    console.log("vocab.createdById:", vocab.createdById);
-    console.log("createdById FE gửi:", createdById);
-    console.log("So sánh:", vocab.createdById === createdById);
-
-
-    // 🔐 So sánh chính xác
-    if (String(vocab.createdById) !== String(createdById)) {
-      return res.status(403).json({ message: "Không có quyền xóa từ vựng này" });
-    }
-
-    // 🗑️ Xóa từ
-    await vocab.deleteOne();
-
-    return res.status(200).json({ message: "Đã xóa từ vựng thành công", });
-  } catch (err) {
-    return res.status(500).json({ message: "Lỗi server khi xóa từ vựng", });
-  }
-};
+}
